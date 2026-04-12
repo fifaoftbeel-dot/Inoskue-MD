@@ -1,5 +1,3 @@
-
-
 import { EventEmitter } from 'events';
 
 EventEmitter.setMaxListeners(0);
@@ -252,8 +250,7 @@ if (!opts['test']) {
     if (global.db) {
         setInterval(async () => {
             if (global.db.data) await global.db.write().catch(console.error)
-            
-        }, 2000);
+        }, 60000);
     }
 }
 
@@ -290,7 +287,8 @@ async function connectionUpdate(update) {
     }
 }
 
-process.on('uncaughtException', console.error)
+process.on('uncaughtException', console.error);
+process.on('unhandledRejection', console.error);
 
 let isInit = true;
 let handler = await import('./handler.js');
@@ -505,7 +503,13 @@ setInterval(async () => {
 
 setInterval(async () => {
     await func.closegc()
-}, 25000)
+}, 120000);
+
+setInterval(() => {
+    if (global.gc) {
+        global.gc();
+    }
+}, 3600000);
 
 _quickTest().catch(console.error);
 
