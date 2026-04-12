@@ -28,7 +28,6 @@ const downloadFile = async (url) => {
 const scrapeSingleFile = (fileUrl) => {
   const quickkey = fileUrl.match(/file\/([^/]+)/)?.[1]
   if (!quickkey) return []
-
   return [
     {
       filename: "mediafire-file",
@@ -42,15 +41,12 @@ const scrapeSingleFile = (fileUrl) => {
 const getFolderFiles = async (folderKey) => {
   let files = []
   let chunk = 1
-
   while (true) {
     const r = crypto.randomBytes(4).toString("hex")
     const url = `https://www.mediafire.com/api/1.4/folder/get_content.php?r=${r}&content_type=files&filter=all&order_by=name&order_direction=asc&chunk=${chunk}&version=1.5&folder_key=${folderKey}&response_format=json`
-
     const res = await axios.get(url, { headers: { "User-Agent": UA } })
     const content = res.data?.response?.folder_content
     const list = content?.files || []
-
     for (const f of list) {
       files.push({
         filename: f.filename,
@@ -59,11 +55,9 @@ const getFolderFiles = async (folderKey) => {
         filePageUrl: `https://www.mediafire.com/file/${f.quickkey}/file`,
       })
     }
-
     if (content?.more_chunks === "no") break
     chunk++
   }
-
   return files
 }
 
@@ -72,11 +66,9 @@ const getAllItems = async (url) => {
     const key = url.match(/folder\/([^/]+)/)?.[1]
     return key ? await getFolderFiles(key) : []
   }
-
   if (url.includes("/file/")) {
     return scrapeSingleFile(url)
   }
-
   return []
 }
 
@@ -84,7 +76,7 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   if (!args[0])
     return conn.reply(
       m.chat,
-      `*🔍 يرجى إرسال رابط ميديا فاير صالح.*\n\n*مثال:*\n${usedPrefix + command} https://www.mediafire.com/file/xxxxx`,
+      `*『 ⚠️ 』يـرجـى إرسـال رابـط مـيـديـا فـايـر صـالـح.*\n\n*📌 مـثـال:*\n${usedPrefix + command} https://www.mediafire.com/file/xxxxx`,
       m
     )
 
@@ -93,62 +85,54 @@ let handler = async (m, { conn, args, usedPrefix, command }) => {
   try {
     const items = await getAllItems(args[0])
     if (!items.length)
-      return conn.reply(m.chat, "❌ *لم أتمكن من العثور على أي ملفات في هذا الرابط.*", m)
+      return conn.reply(m.chat, "❌ *لـم أجـد أي مـلـفـات فـي هـذا الـرابـط.*", m)
 
     for (const item of items) {
       const direct = await getDirectDownload(item.filePageUrl)
       if (!direct) {
-        await conn.reply(m.chat, `❌ *فشل في جلب الملف:* ${item.filename}`, m)
+        await conn.reply(m.chat, `❌ *فـشـل جـلـب الـمـلـف:* ${item.filename}`, m)
         continue
       }
 
       if (item.size > MAX_SIZE) {
         let msgTooLarge = `
-╭─── 「 **مـلـف كـبـيـر جـداً** 」 ───⚔️
-│
-│ ⚠️ *حجم الملف يتجاوز الحد المسموح (100 ميجابايت).*
-│ 📄 **الاسم:** ${item.filename}
-│ 📦 **الحجم:** ${(item.size / 1024 / 1024).toFixed(2)} ميجابايت
-│ 🔗 **رابط التحميل المباشر:**
-│ ${direct}
-│
-╰──────────────────• 🐗`.trim()
+*╭───〔 🔱 مـلـف ضـخـم جـداً 〕───╼*
+*│*
+*│* 💠 *الاسم:* ${item.filename}
+*│* 📦 *الحجم:* ${(item.size / 1024 / 1024).toFixed(2)} MB
+*│* ❗ *الـحـد:* 100 MB
+*│* ⛓️ *رابط التحميل المباشر:*
+*│* ${direct}
+*│*
+*╰────────────────────╼* 🐗`.trim()
         
         await conn.reply(m.chat, msgTooLarge, m)
         continue
       }
 
       await conn.sendMessage(m.chat, { react: { text: "📥", key: m.key } })
-      
       const buffer = await downloadFile(direct)
       
       let captionText = `
-╭─── 「 **تـحـمـيـل مـيـديـا فـايـر** 」 ───⚔️
-│
-│ 📄 **الاسم:** ${item.filename}
-│ 📦 **الحجم:** ${(item.size / 1024 / 1024).toFixed(2)} ميجابايت
-│
-╰──────────────────• 🐗`.trim()
+*╭───〔 💎 تـحـمـيـل مـيـديـا فـايـر 〕───╼*
+*│*
+*│* 💠 *الاسم:* ${item.filename}
+*│* 📦 *الحجم:* ${(item.size / 1024 / 1024).toFixed(2)} MB
+*│* ⚡ *بواسطة:* INOSUKE BOT
+*│*
+*╰────────────────────╼* 🐗`.trim()
 
       await conn.sendMessage(m.chat, { react: { text: "📤", key: m.key } })
-
-      await conn.sendFile(
-        m.chat,
-        buffer,
-        item.filename,
-        captionText,
-        m
-      )
-      
+      await conn.sendFile(m.chat, buffer, item.filename, captionText, m)
       await conn.sendMessage(m.chat, { react: { text: "✅", key: m.key } })
     }
   } catch (e) {
-    conn.reply(m.chat, "❌ *حدث خطأ أثناء محاولة تحميل الملف.*", m)
+    conn.reply(m.chat, "❌ *حـدث خـطأ غـيـر مـتـوقـع أثـنـاء الـعـمـلـيـة.*", m)
   }
 }
 
-handler.help = ["mediafire"]
-handler.command = ["mediafire", "ميديافاير", "ميديا"]
+handler.help = ["ميديافاير"]
+handler.command = ["mediafire", "ميديافاير", "ميديا", "تحميل"]
 handler.tags = ["downloader"]
 handler.limit = true
 
