@@ -1,82 +1,118 @@
 let handler = async (m, { conn, usedPrefix, command, text }) => {
-  // منع الرد إذا لم يبدأ ببادئة
-  if (!m.text.startsWith('.') && 
-      !m.text.startsWith('/') && 
-      !m.text.startsWith('!') && 
-      !m.text.startsWith('#')) {
-    return;
-  }
 
-  if (!text) {
-    return m.reply(
-      `أدخل اسم التطبيق\n\nمثال:\n${usedPrefix + command} facebook lite`,
+  if (!text)
+    return conn.sendListButton(
+      m.chat,
+      `╭─── 「 **تـحـمـيـل تـطـبـيـق** 」 ───⚔️\n│\n│ 📲 أرسل اسم التطبيق الذي تريد تحميله\n│\n│ *مثال:*\n│ ${usedPrefix + command} instagram\n│\n╰──────────────────• 🐗`,
+      {
+        title: 'تطبيقات مقترحة',
+        sections: [{
+          title: '🔥 تطبيقات شائعة',
+          rows: [
+            { header: '📸 Instagram', title: 'تحميل Instagram', id: `${usedPrefix + command} instagram` },
+            { header: '💬 WhatsApp', title: 'تحميل WhatsApp', id: `${usedPrefix + command} whatsapp` },
+            { header: '🎵 TikTok', title: 'تحميل TikTok', id: `${usedPrefix + command} tiktok` },
+            { header: '▶️ YouTube', title: 'تحميل YouTube', id: `${usedPrefix + command} youtube` },
+            { header: '📘 Facebook', title: 'تحميل Facebook Lite', id: `${usedPrefix + command} facebook lite` },
+          ]
+        }]
+      },
+      'Inoskue Bot 🐗',
+      m
     );
-  }
 
-  await m.reply("🔍 جاري البحث عن التطبيق...\n⏳ قد يستغرق الأمر وقتاً إذا كان الملف كبيراً.");
+  conn.apk = conn.apk ? conn.apk : {};
 
-  try {
+  if (text.split('').length <= 2 && !isNaN(text) && m.sender in conn.apk) {
+    let dt = conn.apk[m.sender];
+    if (dt.download) return m.reply('جاري التحميل بالفعل، يرجى الانتظار!');
+
+    try {
+      dt.download = true;
+      await conn.sendMessage(m.chat, { react: { text: '⬇️', key: m.key } });
+
+      let data = await aptoide.download(dt.data[text - 1].id);
+
+      const caption =
+        `╭─── 「 **مـعـلـومـات الـتـطـبـيـق** 」 ───⚔️\n` +
+        `│\n` +
+        `│ 📛 *الاسم:* ${data.appname}\n` +
+        `│ 👨‍💻 *المطور:* ${data.developer}\n` +
+        `│\n` +
+        `╰──────────────────• 🐗`;
+
+      await conn.sendMessage(m.chat, {
+        image: { url: data.img },
+        caption: caption,
+      }, { quoted: m });
+
+      await conn.sendMessage(m.chat, { react: { text: '📤', key: m.key } });
+
+      let dl = await conn.getFile(data.link);
+      await conn.sendMessage(m.chat, {
+        document: dl.data,
+        fileName: data.appname + '.apk',
+        mimetype: dl.mime,
+        caption: `✅ *${data.appname}*`,
+      }, { quoted: m });
+
+      await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
+
+    } catch (e) {
+      console.error(e);
+      await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
+      m.reply('❌ حدث خطأ أثناء تحميل ملف الـ APK.');
+    } finally {
+      dt.download = false;
+    }
+
+  } else {
+    await conn.sendMessage(m.chat, { react: { text: '🔍', key: m.key } });
+
     let data = await aptoide.search(text);
 
     if (!data || data.length === 0) {
-      return m.reply("❌ لم يتم العثور على أي نتائج لهذا الاسم.");
+      await conn.sendMessage(m.chat, { react: { text: '❌', key: m.key } });
+      return m.reply(
+        `╭─── 「 **لـا نـتـائـج** 」 ───⚔️\n│\n│ ❌ لم يتم العثور على نتائج لـ: *${text}*\n│\n╰──────────────────• 🐗`
+      );
     }
 
-    // نأخذ أول نتيجة (الأكثر صلة)
-    let app = data[0];
-    let downloadData = await aptoide.download(app.id);
+    const rows = data.slice(0, 10).map((v, i) => ({
+      header: `📲 ${v.name}`,
+      title: `الحجم: ${(v.size / (1024 * 1024)).toFixed(1)} MB • الإصدار: ${v.version}`,
+      description: `⬇️ ${Number(v.download).toLocaleString()} تحميل`,
+      id: `${usedPrefix + command} ${i + 1}`,
+    }));
 
-    let caption = `
-✅ *تم العثور على التطبيق بنجاح*
+    const listData = {
+      title: `نتائج البحث عن: ${text}`,
+      sections: [{
+        title: '📦 التطبيقات المتاحة',
+        rows: rows
+      }]
+    };
 
-📱 *الاسم:* ${downloadData.appname}
-👨‍💻 *المطور:* ${downloadData.developer}
-📦 *الحجم:* ${app.size || 'غير معروف'}
-🔖 *الإصدار:* ${app.version || 'غير معروف'}
+    conn.apk[m.sender] = {
+      download: false,
+      data: data,
+      time: setTimeout(() => {
+        delete conn.apk[m.sender];
+      }, 3600000),
+    };
 
-⚠️ جاري إرسال الملف... (قد يستغرق دقائق إذا كان حجمه كبيراً)
-`.trim();
-
-    // إرسال صورة التطبيق
-    await conn.sendMessage(
+    conn.sendListButton(
       m.chat,
-      {
-        image: { url: downloadData.img },
-        caption: caption,
-      },
-      { quoted: m }
+      `╭─── 「 **نـتـائـج الـبـحـث** 」 ───⚔️\n│\n│ 🔍 *البحث عن:* ${text}\n│ 📦 *عدد النتائج:* ${data.length}\n│\n│ اختر التطبيق من القائمة أدناه\n│\n╰──────────────────• 🐗`,
+      listData,
+      'Inoskue Bot 🐗',
+      m
     );
-
-    await m.reply("📤 جاري رفع الملف إلى واتساب...");
-
-    // إرسال الملف باستخدام Stream (أفضل للملفات الكبيرة)
-    let dl = await conn.getFile(downloadData.link);
-
-    await conn.sendMessage(
-      m.chat,
-      {
-        document: dl.data,           // يدعم Buffer أو Stream
-        fileName: `${downloadData.appname}.apk`,
-        mimetype: dl.mime || "application/vnd.android.package-archive",
-      },
-      { 
-        quoted: m,
-        // يمكن إضافة هذه الخيارات للملفات الكبيرة
-        // ptv: false, 
-        // seconds: 0 
-      }
-    );
-
-    await m.reply("✅ تم إرسال التطبيق بنجاح!");
-
-  } catch (e) {
-    console.error(e);
-    m.reply("❌ حدث خطأ أثناء تحميل أو إرسال التطبيق.\nربما الملف كبير جداً أو هناك مشكلة في الرابط.");
   }
 };
 
-handler.help = ["apk"];
-handler.tags = ["downloader"];
+handler.help = ['apk'];
+handler.tags = ['downloader'];
 handler.command = /^(apk|تطبيق)$/i;
 handler.limit = true;
 
@@ -85,7 +121,7 @@ export default handler;
 const aptoide = {
   search: async function (args) {
     let res = await global.fetch(
-      `https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(args)}&limit=10`
+      `https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(args)}&limit=10`,
     );
     res = await res.json();
 
@@ -104,12 +140,12 @@ const aptoide = {
 
   download: async function (id) {
     let res = await global.fetch(
-      `https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(id)}&limit=1`
+      `https://ws75.aptoide.com/api/7/apps/search?query=${encodeURIComponent(id)}&limit=1`,
     );
     res = await res.json();
 
     if (!res.datalist || !res.datalist.list || res.datalist.list.length === 0) {
-      throw new Error("لم يتم العثور على التطبيق.");
+      throw new Error('لم يتم العثور على التطبيق.');
     }
 
     const app = res.datalist.list[0];
