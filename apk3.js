@@ -111,9 +111,9 @@ let handler = async (m, { conn, usedPrefix, command, text }) => {
   }
 };
 
-handler.help = ['apk'];
+handler.help = ['apk3'];
 handler.tags = ['downloader'];
-handler.command = /^(apk|تطبيق)$/i;
+handler.command = /^(apk3|apk3)$/i;
 handler.limit = true;
 
 export default handler;
