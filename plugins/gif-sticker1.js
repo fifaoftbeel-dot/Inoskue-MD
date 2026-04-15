@@ -65,8 +65,8 @@ const handler = async (m, { conn, text, command }) => {
 
             const sticker = new Sticker(data, {
                 type: 'full',
-                pack: 'silana ai',
-                author: 'bot By noureddine ouafy', // Watermark added here
+                pack: 'alixmastafa bot ',
+                author: 'bot By Mustafa', // Watermark added here
                 quality: 70
             });
 
